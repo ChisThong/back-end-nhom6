@@ -27,10 +27,3 @@ Route::prefix('admin')->name('admin.')->group(function () {
     Route::resource('quizzes', AdminQuizController::class)->parameters(['quizzes' => 'id']);
     Route::resource('questions', AdminQuestionController::class)->parameters(['questions' => 'id']);
 });
-Route::post('/logout',function(Request $request){
-
-    session()->flush();
-
-    return redirect('/login');
-
-})->name('logout');
