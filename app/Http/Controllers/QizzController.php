@@ -16,37 +16,37 @@ class QizzController extends Controller
         return view('chon-de', compact('quizzes'));
     }
     public function show(String $id)
-    {   
-        if(!Auth::check()){
+    {
+        if (!Auth::check()) {
             return redirect('/login')->withErrors(['login_error' => 'Vui lòng đăng nhập để tham gia thi']);
         }
         $quiz = Quizz::findOrFail($id);
         $questions = $quiz->getQuestions();
         session(['quiz_start_time' => time()]);
-        
+
         return view('thi', compact('quiz', 'questions'));
     }
     public function submit(Request $request, String $quid)
     {
         $quiz = Quizz::findOrFail($quid);
         $startTime = session('quiz_start_time', time());
-        $questions = $quiz->getQuestions(); 
+        $questions = $quiz->getQuestions();
         $correctScores = explode(',', $quiz->correct_score);
         $incorrectScores = explode(',', $quiz->incorrect_score);
-        
+
         $userAnswers = $request->input('ans', []);
         $score = 0;
         foreach ($questions as $index => $question) {
             $cScore = isset($correctScores[$index]) ? (int)$correctScores[$index] : (int)$correctScores[0];
             $iScore = isset($incorrectScores[$index]) ? (int)$incorrectScores[$index] : (int)$incorrectScores[0];
-            
+
             $userChoice = $userAnswers[$question->qid] ?? null;
             $correctOption = $question->options->where('score', '>', 0)->first();
-            
+
             if ($userChoice && $correctOption && $userChoice == $correctOption->oid) {
-                $score += $cScore; 
+                $score += $cScore;
             } else {
-                $score -= $iScore; 
+                $score -= $iScore;
             }
         }
         $score = max(0, $score);
@@ -71,7 +71,7 @@ class QizzController extends Controller
             'manual_valuation' => 0,
         ]);
         return redirect()->route('quiz.result', $result->rid)
-                        ->with('success', 'Bạn đã nộp bài thành công!');
+            ->with('success', 'Bạn đã nộp bài thành công!');
     }
     public function result(String $rid)
     {
