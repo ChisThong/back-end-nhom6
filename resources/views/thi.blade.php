@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Phòng Thi Trắc Nghiệm - Phòng CTSV</title>
+    <title>{{ $quiz->quiz_name }} - Phòng Thi</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <meta name="csrf-token" content="{{ csrf_token() }}">
     <style>
         .q-number-btn {
             width: 40px;
@@ -16,276 +15,190 @@
             justify-content: center;
             border-radius: 4px;
             cursor: pointer;
+            font-weight: bold;
             transition: all 0.2s ease;
         }
         .q-number-btn:hover {
             transform: scale(1.1);
-            opacity: 0.9;
-        }
-        .status-badge {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 9999;
-            display: none;
         }
         .question-box {
             border-left: 5px solid #6c757d;
+            scroll-margin-top: 30px;
         }
-        /* Hiệu ứng viền xanh cho câu đã lưu đáp án */
-        .question-box.saved {
+        .question-box.answered {
             border-left: 5px solid #198754;
+        }
+        .style-label {
+            cursor: pointer;
+            display: block;
+            transition: background-color 0.2s;
+        }
+        .style-label:hover {
+            background-color: #f0f2f5;
+        }
+        .sticky-sidebar {
+            position: sticky;
+            top: 20px;
         }
     </style>
 </head>
 <body class="bg-light">
 
-    <div id="saving-status" class="badge bg-success p-2 status-badge shadow">
-        <span class="spinner-border spinner-border-sm me-1" role="status"></span> Đang tự động lưu...
-    </div>
-
-    <div class="container-fluid my-4">
-        <div class="row mb-3">
-            <div class="col-12">
-                <div class="card p-3 shadow-sm">
-                    <h3 id="quiz-title" class="text-primary mb-0">Đang tải đề thi...</h3>
-                </div>
-            </div>
-        </div>
-
-        <div class="row">
-            <div class="col-md-4 mb-3">
-                <div class="card p-3 shadow-sm sticky-top" style="top: 20px;">
-                    <div class="text-center mb-3">
-                        <h5>Thời gian còn lại</h5>
-                        <h2 id="countdown-timer" class="text-danger fw-bold">00:00</h2>
-                    </div>
-                    
-                    <hr>
-                    
-                    <h5>Danh sách câu hỏi</h5>
-                    <p class="small text-muted">Màu xanh: Đã lưu | Màu xám: Chưa làm</p>
-                    <div id="question-navigation" class="d-flex flex-wrap"></div>
-
-                    <hr>
-                    <button id="btn-submit-exam" class="btn btn-danger w-100 fw-bold py-2 shadow-sm" onclick="submitExam()">NỘP BÀI THI</button>
-                </div>
-            </div>
-
-            <div class="col-md-8">
-                <input type="hidden" id="quiz-id" value="19"> 
+   <nav class="navbar navbar-dark bg-primary shadow-sm mb-4">
+        <div class="container-fluid px-4">
+            <span class="navbar-brand mb-0 h1 fw-bold">
+                <i class="bi bi-mortarboard-fill"></i> CỔNG THI SINH VIÊN
+            </span>
+            <span class="text-white fw-semibold">
                 
-                <div id="quiz-container">
-                    <div class="text-center my-5">
-                        <div class="spinner-border text-primary" role="status"></div>
-                        <p class="mt-2">Hệ thống đang tải câu hỏi từ Bộ nhớ đệm...</p>
-                    </div>
+                @if(auth()->check())
+                    @php
+                        $currentUser = auth()->user();
+                    @endphp
+                    <span class="me-3">
+                        <i class="bi bi-person-circle"></i> Xin chào, {{ $currentUser->first_name }}!
+                    </span>
+                    <a href="{{ url('/logout') }}" class="btn btn-danger btn-sm fw-bold">
+                        <i class="fas fa-sign-out-alt"></i> Đăng xuất
+                    </a>
+                @else
+                    <a href="{{ route('login.form') }}" class="btn btn-light fw-bold text-primary">
+                        Đăng nhập
+                    </a>
+                @endif
+
+            </span>
+        </div>
+    </nav>
+
+    <div class="container-fluid px-4">
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card p-3 shadow-sm border-0 bg-white">
+                    <h3 class="text-primary mb-0 fw-bold">{{ $quiz->quiz_name }}</h3>
+                    @if($quiz->description)
+                        <div class="text-muted small mt-2">{!! $quiz->description !!}</div>
+                    @endif
                 </div>
             </div>
         </div>
+
+        <form id="form-exam-submit" action="{{ route('quiz.submit', $quiz->quid) }}" method="POST">
+            @csrf
+            <input type="hidden" id="total_time" name="total_time" value="0">
+
+            <div class="row">
+                <div class="col-md-4 mb-4">
+                    <div class="card p-3 shadow-sm border-0 sticky-sidebar bg-white">
+                        <div class="text-center mb-3">
+                            <h6 class="text-secondary uppercase fw-bold text-muted">Thời gian còn lại</h6>
+                            <h1 id="countdown-timer" class="text-danger fw-bold display-5">00:00</h1>
+                        </div>
+                        
+                        <hr class="text-muted">
+                        
+                        <h6 class="fw-bold text-dark mb-2">Sơ đồ câu hỏi</h6>
+                        <p class="small text-muted mb-3">Màu xanh: Đã chọn | Màu xám: Chưa làm</p>
+                        
+                        <div class="d-flex flex-wrap mb-3">
+                            @foreach($questions as $index => $question)
+                                <div id="nav-q-{{ $question->qid }}" 
+                                     class="q-number-btn bg-secondary text-white" 
+                                     onclick="scrollToQuestion('q-box-{{ $question->qid }}')">
+                                    {{ $index + 1 }}
+                                </div>
+                            @endforeach
+                        </div>
+
+                        <hr class="text-muted">
+                        
+                        <button type="button" class="btn btn-danger w-100 fw-bold py-2 shadow-sm fs-5" onclick="submitExam(false)">
+                            NỘP BÀI THI
+                        </button>
+                    </div>
+                </div>
+
+                <div class="col-md-8">
+                    @if(count($questions) == 0)
+                        <div class="alert alert-warning text-center fw-bold shadow-sm">
+                            Đề thi này hiện tại chưa được cấu hình câu hỏi trong cơ sở dữ liệu!
+                        </div>
+                    @else
+                        @foreach($questions as $index => $question)
+                            <div id="q-box-{{ $question->qid }}" class="card p-4 mb-4 shadow-sm border-0 question-box bg-white">
+                                <h5 class="fw-bold text-dark mb-3">
+                                    Câu {{ $index + 1 }}: {!! $question->question !!}
+                                </h5>
+                                
+                             <div class="options-group ps-2">
+                                @foreach($question->options as $option)
+                                    <div class="form-check my-3">
+                                        <input class="form-check-input answer-radio" 
+                                            type="radio" 
+                                            name="ans[{{ $question->qid }}]" 
+                                            data-qid="{{ $question->qid }}"
+                                            data-index="{{ $index }}"
+                                            id="opt-{{ $option->oid }}-{{ $index }}" 
+                                            value="{{ $option->oid }}">
+                                        
+                                        <label class="form-check-label w-100 p-2 rounded style-label" for="opt-{{ $option->oid }}-{{ $index }}">
+                                            {{ $option->q_option }}
+                                        </label>
+                                    </div>
+                                @endforeach
+                            </div>
+                            </div>
+                        @endforeach
+                    @endif
+                </div>
+            </div>
+        </form>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bundle.min.js"></script>
 
     <script>
-// Thay vì lấy cứng value="19" ở HTML, ta đọc từ localStorage do trang chon-de truyền sang
-        const quizId = localStorage.getItem('selected_quiz_id') || document.getElementById('quiz-id').value;
-        let examDurationSeconds = 0;
+        // Lấy thời gian làm bài động trực tiếp từ cột duration của đề thi (quy đổi sang giây)
+        const quizId = "{{ $quiz->quid }}";
+        const totalDurationMinutes = parseInt("{{ $quiz->duration }}") || 10;
+        let examDurationSeconds = totalDurationMinutes * 60;
         let timerInterval;
 
-        // 1. KHI TRANG WEB LOAD: Tự động gọi API lấy đề thi
         document.addEventListener("DOMContentLoaded", function() {
-            fetchExamData(quizId);
+            // Thiết lập bộ đếm thời gian an toàn thông qua LocalStorage (chống mất thời gian khi F5)
+            handleTimerSetup();
+            // Khôi phục đáp án đã làm trước đó nếu lỡ tay tải lại trang
+            restoreSavedAnswers();
+
+            // Lắng nghe sự kiện click chọn đáp án để cập nhật trạng thái màu sắc sơ đồ
+            document.querySelectorAll('.answer-radio').forEach(radio => {
+                radio.addEventListener('change', function() {
+                    const qid = this.dataset.qid;
+                    const oid = this.value;
+                    
+                    markQuestionAsDone(qid);
+                    saveAnswerLocally(qid, oid);
+                });
+            });
         });
 
-        // Hàm gọi API lấy dữ liệu đề thi đã được Laravel Cache tối ưu
- // TRÁCH NHIỆM FRONT-END: Gọi API lấy toàn bộ câu hỏi thật của đề thi
-         function fetchExamData(id) {
-                console.log(`Đang gọi API lấy toàn bộ câu hỏi cho mã đề thi: ${id}`);
-                
-                // Front-end dùng fetch để gửi request lên đường dẫn API lấy chi tiết đề thi
-                fetch(`/api/quiz-questions/${id}`)
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error('Lỗi mạng hoặc API chưa được Back-end cấu hình');
-                        }
-                        return response.json();
-                    })
-                    .then(res => {
-                        // Nếu có API thật và Back-end trả về đúng dữ liệu
-                        if (res.status === "success" && res.data) {
-                            renderExam(res.data);
-                            startCountdown(res.data.duration);
-                        }
-                    })
-                    .catch(err => {
-                        console.error("Chưa kết nối được Database thật, chạy dữ liệu mẫu dự phòng tối ưu theo ID:", err);
-                        
-                        // ĐOẠN ĐÃ SỬA: Khởi tạo cục dữ liệu dự phòng rỗng
-                        let backupExamData = {
-                            quiz_title: "",
-                            duration: 15, 
-                            questions: []
-                        };
+        // Xử lý thiết lập bộ đếm thời gian
+        function handleTimerSetup() {
+            const storageTimerKey = `quiz_timer_${quizId}`;
+            let savedTime = localStorage.getItem(storageTimerKey);
 
-                        // Kiểm tra ID để gán thời gian và câu hỏi demo tương ứng khi chạy giao diện độc lập
-                        if (parseInt(id) === 28) {
-                            backupExamData.quiz_title = "Bài thu hoạch Tuần SHCD - SV giữa khóa năm học 2020-2021";
-                            backupExamData.duration = 40; // Đổi thành 40 phút
-                            backupExamData.questions = [
-                                { qid: 281, question: "Câu hỏi mẫu bài giữa khóa 2020-2021: Quy chế rèn luyện của trường gồm mấy bước đánh giá?", options: [{ oid: 1, option_value: "3 bước" }, { oid: 2, option_value: "4 bước" }] }
-                            ];
-                        } 
-                        else if (parseInt(id) === 31) {
-                            backupExamData.quiz_title = "Bài thu hoạch Tuần SHCD - SV đầu khóa năm học 2020-2021";
-                            backupExamData.duration = 40; // Đổi thành 40 phút
-                            backupExamData.questions = [
-                                { qid: 311, question: "Câu hỏi mẫu bài đầu khóa 2020-2021: Sinh viên nghỉ học bao nhiêu % số tiết của môn thì bị cấm thi?", options: [{ oid: 5, option_value: "20%" }, { oid: 6, option_value: "30%" }] }
-                            ];
-                        } 
-                        else if (parseInt(id) === 52) {
-                            backupExamData.quiz_title = "Bài thu hoạch Tuần SHCD - SV giữa khoá năm học 2021-2022";
-                            backupExamData.duration = 40; // Đổi thành 40 phút
-                            backupExamData.questions = [
-                                { qid: 521, question: "Câu hỏi mẫu bài giữa khóa 2021-2022: Chuẩn đầu ra ngoại ngữ bắt buộc đối với ngành CNTT là gì?", options: [{ oid: 7, option_value: "TOEIC 450" }, { oid: 8, option_value: "TOEIC 500" }] }
-                            ];
-                        } 
-                        else {
-                            // Mặc định là đề thi thử (Demo) mã đề 19
-                            backupExamData.quiz_title = "THI TRẮC NGHIỆM PHÒNG CÔNG TAC SINH VIÊN - ĐỀ MẪU";
-                            backupExamData.duration = 15; // 15 phút
-                            backupExamData.questions = [
-                                {
-                                    qid: 1,
-                                    question: "Hệ thống quản lý phiên bản mã nguồn phân tán phổ biến nhất hiện nay là gì?",
-                                    options: [{ oid: 11, option_value: "SVN" }, { oid: 12, option_value: "Git" }, { oid: 13, option_value: "Mercurial" }, { oid: 14, option_value: "CVS" }]
-                                },
-                                {
-                                    qid: 2,
-                                    question: "Trong kiến trúc phần mềm Laravel, thư mục nào dùng để chứa các file giao diện Blade View?",
-                                    options: [{ oid: 21, option_value: "app/Http/Controllers" }, { oid: 22, option_value: "config/" }, { oid: 23, option_value: "resources/views" }, { oid: 24, option_value: "routes/" }]
-                                }
-                            ];
-                        }
-
-                        // Đổ dữ liệu đã được phân loại theo ID ra màn hình
-                        renderExam(backupExamData);
-                        startCountdown(backupExamData.duration);
-                    });
+            if (savedTime !== null) {
+                examDurationSeconds = parseInt(savedTime);
+            } else {
+                localStorage.setItem(storageTimerKey, examDurationSeconds);
             }
-
-        // Hàm sinh (render) HTML giao diện câu hỏi từ cục JSON trả về
-        function renderExam(data) {
-            document.getElementById('quiz-title').innerText = data.quiz_title;
-            
-            const quizContainer = document.getElementById('quiz-container');
-            const navContainer = document.getElementById('question-navigation');
-            
-            quizContainer.innerHTML = '';
-            navContainer.innerHTML = '';
-
-            data.questions.forEach((question, index) => {
-                const qNum = index + 1;
-
-                // A. Render ô số câu hỏi ở cột bên trái
-                const navBtn = document.createElement('div');
-                navBtn.id = `nav-q-${question.qid}`;
-                navBtn.className = 'q-number-btn bg-secondary text-white fw-bold';
-                navBtn.innerText = qNum;
-                navBtn.setAttribute('onclick', `scrollToQuestion('q-box-${question.qid}')`);
-                navContainer.appendChild(navBtn);
-
-                // B. Render nội dung câu hỏi và các đáp án ở cột bên phải
-                const qBox = document.createElement('div');
-                qBox.id = `q-box-${question.qid}`;
-                qBox.className = 'card p-4 mb-4 shadow-sm question-box';
-                
-                let optionsHtml = '';
-                question.options.forEach(option => {
-                    optionsHtml += `
-                        <div class="form-check my-2">
-                            <input class="form-check-input answer-radio" 
-                                   type="radio" 
-                                   name="${question.qid}" 
-                                   id="opt-${option.oid}" 
-                                   value="${option.oid}">
-                            <label class="form-check-label w-100 p-1 rounded style-label" for="opt-${option.oid}">
-                                ${option.option_value}
-                            </label>
-                        </div>
-                    `;
-                });
-
-                qBox.innerHTML = `
-                    <h5 class="fw-bold text-dark mb-3">Câu ${qNum}: ${question.question}</h5>
-                    <div class="options-group">
-                        ${optionsHtml}
-                    </div>
-                `;
-                quizContainer.appendChild(qBox);
-            });
-
-            // C. ĐĂNG KÝ SỰ KIỆN: Lắng nghe hành vi chọn đáp án (Event Delegation)
-            quizContainer.addEventListener('change', function(event) {
-                if (event.target.classList.contains('answer-radio')) {
-                    const qid = event.target.name;
-                    const oid = event.target.value;
-                    saveAnswerToServer(quizId, qid, oid);
-                }
-            });
+            startCountdown();
         }
 
-        // 2. LOGIC LƯU ĐÁP ÁN TỰ ĐỘNG (Auto-save ngầm qua AJAX)
-        function saveAnswerToServer(quizId, qid, oid) {
-            const statusBadge = document.getElementById('saving-status');
-            statusBadge.style.display = 'block';
-
-            fetch('/api/save-answer', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                },
-                body: JSON.stringify({
-                    quiz_id: parseInt(quizId),
-                    qid: parseInt(qid),
-                    oid: parseInt(oid)
-                })
-            })
-            .then(response => response.json())
-            .then(res => {
-                setTimeout(() => { statusBadge.style.display = 'none'; }, 500);
-
-                // Thêm hiệu ứng đổi màu UI đồng bộ khi Backend phản hồi thành công
-                // Duy không cần sửa file PHP nào cả, xử lý thuần DOM ở đây là đủ
-                const navBtn = document.getElementById(`nav-q-${qid}`);
-                const qBox = document.getElementById(`q-box-${qid}`);
-                
-                if (navBtn) {
-                    navBtn.classList.remove('bg-secondary');
-                    navBtn.classList.add('bg-success'); // Ô bên trái sang màu xanh lá
-                }
-                if (qBox) {
-                    qBox.classList.add('saved'); // Đổi màu viền câu hỏi bên phải sang màu xanh để báo hiệu đã lưu
-                }
-            })
-            .catch(err => {
-                console.error("Lỗi đồng bộ đáp án ngầm: ", err);
-                // Giả lập UI mượt ngay cả khi Backend chưa bật hoặc lỗi route
-                const navBtn = document.getElementById(`nav-q-${qid}`);
-                if (navBtn) {
-                    navBtn.classList.remove('bg-secondary');
-                    navBtn.classList.add('bg-success');
-                }
-                setTimeout(() => { statusBadge.style.display = 'none'; }, 400);
-            });
-        }
-
-        // 3. ĐỒNG HỒ ĐẾM NGƯỢC THUẦN CLIENT
-        function startCountdown(durationMinutes) {
-            examDurationSeconds = durationMinutes * 60;
+        // Đồng hồ đếm ngược chạy mượt mà theo từng giây
+        function startCountdown() {
             const timerDisplay = document.getElementById('countdown-timer');
+            const storageTimerKey = `quiz_timer_${quizId}`;
 
             clearInterval(timerInterval);
             timerInterval = setInterval(() => {
@@ -296,62 +209,78 @@
                 seconds = seconds < 10 ? '0' + seconds : seconds;
 
                 timerDisplay.innerText = `${minutes}:${seconds}`;
+                localStorage.setItem(storageTimerKey, examDurationSeconds);
+
+                // Tính toán tổng thời gian đã làm (bằng giây) đẩy vào input ẩn để gửi lên controller
+                let timeSpent = (totalDurationMinutes * 60) - examDurationSeconds;
+                document.getElementById('total_time').value = timeSpent;
 
                 if (--examDurationSeconds < 0) {
                     clearInterval(timerInterval);
+                    localStorage.removeItem(storageTimerKey);
+                    localStorage.removeItem(`quiz_ans_${quizId}`);
                     timerDisplay.innerText = "HẾT GIỜ!";
-                    alert("Thời gian làm bài đã hết! Hệ thống tự động nộp bài.");
-                    submitExam(); 
+                    alert("Thời gian làm bài của bạn đã hết! Hệ thống tự động nộp bài thi.");
+                    submitExam(true); // Ép buộc nộp bài không hiển thị confirm khi hết giờ
                 }
-            }, 1000); 
+            }, 1000);
         }
 
+        // Đổi màu sơ đồ câu hỏi (Menu trái) và khối câu hỏi (Phải) sang màu xanh lá
+        function markQuestionAsDone(qid) {
+            const navBtn = document.getElementById(`nav-q-${qid}`);
+            const qBox = document.getElementById(`q-box-${qid}`);
+            if (navBtn) {
+                navBtn.classList.remove('bg-secondary');
+                navBtn.classList.add('bg-success');
+            }
+            if (qBox) {
+                qBox.classList.add('answered');
+            }
+        }
+
+        // Lưu tạm đáp án vào bộ nhớ trình duyệt đề phòng sự cố lag mạng hoặc F5 đột ngột
+        function saveAnswerLocally(qid, oid) {
+            let localAnswers = JSON.parse(localStorage.getItem(`quiz_ans_${quizId}`)) || {};
+            localAnswers[qid] = oid;
+            localStorage.setItem(`quiz_ans_${quizId}`, JSON.stringify(localAnswers));
+        }
+
+        // Khôi phục trạng thái tick chọn các phương án từ bộ nhớ trình duyệt
+        function restoreSavedAnswers() {
+            let localAnswers = JSON.parse(localStorage.getItem(`quiz_ans_${quizId}`)) || {};
+            Object.keys(localAnswers).forEach(qid => {
+                const oid = localAnswers[qid];
+                const radioTarget = document.getElementById(`opt-${oid}`);
+                if (radioTarget) {
+                    radioTarget.checked = true;
+                    markQuestionAsDone(qid);
+                }
+            });
+        }
+
+        // Cuộn mượt màn hình tới vị trí câu hỏi tương ứng khi click vào nút sơ đồ
         function scrollToQuestion(elementId) {
             const element = document.getElementById(elementId);
             if (element) {
-                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                element.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
         }
 
-        // 4. ĐÃ HOÀN THIỆN: LOGIC GOM ĐÁP ÁN KHI ẤN NỘP BÀI TẠI FRONT-END
-         function submitExam() {
-            if (!confirm("Bạn có chắc chắn muốn nộp bài thi này không?")) {
+        // Hàm kích hoạt gửi Form chính thức lên Laravel Controller để chấm điểm thật
+        function submitExam(isForce = false) {
+            if (!isForce && !confirm("Bạn có chắc chắn muốn kết thúc bài làm và nộp bài thi này không?")) {
                 return;
             }
 
-            // 1. Dừng đồng hồ đếm ngược lập tức
             clearInterval(timerInterval);
             
-            // 2. Gom toàn bộ đáp án sinh viên đã chọn trên màn hình
-            const studentAnswers = [];
-            const radios = document.querySelectorAll('.answer-radio:checked');
-            
-            radios.forEach(radio => {
-                studentAnswers.push({
-                    qid: parseInt(radio.name),
-                    oid: parseInt(radio.value)
-                });
-            });
+            // Xóa sạch bộ nhớ tạm thời của trình duyệt cho đề thi hiện tại khi đã bấm nộp thành công
+            localStorage.removeItem(`quiz_timer_${quizId}`);
+            localStorage.removeItem(`quiz_ans_${quizId}`);
 
-            console.log("Mảng đáp án Front-end sẵn sàng nộp:", studentAnswers);
-
-            // 3. Đếm tổng số câu hỏi có trên giao diện để làm mẫu số (ví dụ: 40 câu hoặc 2 câu mẫu)
-            const totalQuestions = document.querySelectorAll('.question-box').length;
-            const answeredCount = studentAnswers.length;
-
-            // 4. LƯU TẠM DỮ LIỆU VÀO STORAGE (Để trang ket-qua.blade.php bốc ra hiển thị)
-            // Vì chưa kết nối API chấm điểm thật của Back-end, ta giả lập số câu đúng bằng số câu SV đã bấm chọn
-            localStorage.setItem('last_correct', answeredCount.toString()); 
-            localStorage.setItem('last_total', totalQuestions.toString());
-            
-            // Giả lập công thức tính điểm hệ 10: (Số câu chọn / Tổng số câu) * 10
-            const mockScore = totalQuestions > 0 ? ((answeredCount / totalQuestions) * 10).toFixed(1) : "0.0";
-            localStorage.setItem('last_score', mockScore);
-
-            alert(`Nộp bài thành công! Hệ thống đã ghi nhận bạn làm được ${answeredCount}/${totalQuestions} câu hỏi.`);
-            
-            // 5. CHUYỂN HƯỚNG SANG TRANG KẾT QUẢ ĐÃ TẠO
-            window.location.href = '/ket-qua';
+            // Gửi dữ liệu form một cách đồng bộ lên server
+            document.getElementById('form-exam-submit').submit();
         }
     </script>
 </body>

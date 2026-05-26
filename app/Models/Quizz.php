@@ -34,9 +34,10 @@ class Quizz extends Model
         'demo',
     ];
 
-      public function getQuestions()
-    {
-        $ids = explode(',', $this->qids);
-        return QBank::with('options')->whereIn('qid', $ids)->get();
-    }
+   public function getQuestions()
+{
+    $ids = explode(',', $this->qids);
+    
+    return QBank::with('options')->whereIn('qid', $ids)->get();
+}
 }

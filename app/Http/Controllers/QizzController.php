@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Quizz;
 
 use Illuminate\Http\Request;
+use App\Models\Result;
+use Illuminate\Support\Facades\Auth;
 
 class QizzController extends Controller
 {
@@ -13,34 +15,68 @@ class QizzController extends Controller
         $quizzes = Quizz::select(['quid', 'quiz_name', 'description', 'start_date', 'end_date', 'duration', 'noq'])->orderBy('quid', 'desc')->get();
         return view('chon-de', compact('quizzes'));
     }
-    public function show($id)
-    {
+    public function show(String $id)
+    {   
+        if(!Auth::check()){
+            return redirect('/login')->withErrors(['login_error' => 'Vui lòng đăng nhập để tham gia thi']);
+        }
         $quiz = Quizz::findOrFail($id);
         $questions = $quiz->getQuestions();
+        session(['quiz_start_time' => time()]);
+        
         return view('thi', compact('quiz', 'questions'));
     }
-    public function submit(Request $request, $id)
+    public function submit(Request $request, String $quid)
     {
-        $quiz = Quizz::with('questions.options')->findOrFail($id);
-        $studentAnswers = $request->input('answer', []);
+        $quiz = Quizz::findOrFail($quid);
+        $startTime = session('quiz_start_time', time());
+        $questions = $quiz->getQuestions(); 
+        $correctScores = explode(',', $quiz->correct_score);
+        $incorrectScores = explode(',', $quiz->incorrect_score);
+        
+        $userAnswers = $request->input('ans', []);
         $score = 0;
-        $total = $quiz->questions->count();
-        foreach ($quiz->questions as $question) {
-            $correctOption = $question->options->where('q_option_match', 1)->first();
-            if (isset($studentAnswers[$question->qid])) {
-                $selectedOid = $studentAnswers[$question->qid];
-                if ($correctOption && $selectedOid == $correctOption->oid) {
-                    $score++;
-                }
+        foreach ($questions as $index => $question) {
+            $cScore = isset($correctScores[$index]) ? (int)$correctScores[$index] : (int)$correctScores[0];
+            $iScore = isset($incorrectScores[$index]) ? (int)$incorrectScores[$index] : (int)$incorrectScores[0];
+            
+            $userChoice = $userAnswers[$question->qid] ?? null;
+            $correctOption = $question->options->where('score', '>', 0)->first();
+            
+            if ($userChoice && $correctOption && $userChoice == $correctOption->oid) {
+                $score += $cScore; 
+            } else {
+                $score -= $iScore; 
             }
         }
-        session(['last_score' => $score, 'last_total' => $total]);
-        return redirect()->route('ket-qua');
+        $score = max(0, $score);
+        $totalPossibleScore = $quiz->duration;
+        $percentage = ($totalPossibleScore > 0) ? ($score / $totalPossibleScore) * 100 : 0;
+        $result = Result::create([
+            'quid' => $quid,
+            'uid' => Auth::id(),
+            'score_obtained' => $score,
+            'percentage_obtained' => $percentage,
+            'result_status' => ($percentage >= $quiz->pass_percentage) ? 'Pass' : 'Fail',
+            'start_time' => $startTime,
+            'end_time' => time(),
+            'total_time' => (int)$request->input('total_time', 0),
+            'attempted_ip' => $request->ip(),
+            'categories' => $quiz->gids ?? '0',
+            'r_qids' => $quiz->qids ?? '0',
+            'category_range' => '0',
+            'individual_time' => '0',
+            'score_individual' => '0',
+            'photo' => 'none',
+            'manual_valuation' => 0,
+        ]);
+        return redirect()->route('quiz.result', $result->rid)
+                        ->with('success', 'Bạn đã nộp bài thành công!');
     }
-    public function ketQua()
+    public function result(String $rid)
     {
-        $score = session('last_score', 0);
-        $total = session('last_total', 0);
-        return view('ket-qua', compact('score', 'total'));
+        $result = Result::findOrFail($rid);
+        $quiz = Quizz::findOrFail($result->quid);
+        return view('ket-qua', compact('result', 'quiz'));
     }
 }
