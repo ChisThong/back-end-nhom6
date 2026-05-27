@@ -29,4 +29,7 @@ class Result extends Model
         'photo',
         'manual_valuation',
     ];
+    public function quiz() {
+        return $this->belongsTo(Quizz::class, 'quid', 'quid');
+    }
 }

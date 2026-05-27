@@ -23,8 +23,7 @@ class QBank extends Model
     ];
 
     public function options()
-{
-
-    return $this->hasMany(Options::class, 'qid', 'qid');
-}
+    {
+        return $this->hasMany(Options::class, 'qid', 'qid');
+    }
 }

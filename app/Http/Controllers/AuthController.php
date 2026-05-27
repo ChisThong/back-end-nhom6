@@ -28,7 +28,7 @@ class AuthController extends Controller
             if ($user->gid == 0) {
                 return redirect('/admin');
             }
-            return redirect('/');
+            return redirect()->intended('/');
         }
 
         if (!$user) {

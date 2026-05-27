@@ -3,7 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
+
 use Illuminate\Foundation\Auth\User as Authenticatable;
 
 class Users extends Authenticatable
@@ -30,7 +30,6 @@ class Users extends Authenticatable
             'user_status',
             'web_token',
             'android_token',
-
             'studentid',
             'classid',
             'facultyid',
@@ -42,9 +41,5 @@ class Users extends Authenticatable
            
         ];
 
-        public function khoa()
-        {
-            return $this->belongsTo(Khoa::class, 'facultyid', 'facultyid');
-        }
     
 }

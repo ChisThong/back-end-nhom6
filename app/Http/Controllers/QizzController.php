@@ -17,31 +17,26 @@ class QizzController extends Controller
     }
     public function show(String $id)
     {
-        if (!Auth::check()) {
-            return redirect('/login')->withErrors(['login_error' => 'Vui lòng đăng nhập để tham gia thi']);
-        }
         $quiz = Quizz::findOrFail($id);
         $questions = $quiz->getQuestions();
         session(['quiz_start_time' => time()]);
-
         return view('thi', compact('quiz', 'questions'));
     }
     public function submit(Request $request, String $quid)
     {
-        $quiz = Quizz::findOrFail($quid);
+        $dethi = Quizz::findOrFail($quid);
         $startTime = session('quiz_start_time', time());
-        $questions = $quiz->getQuestions();
-        $correctScores = explode(',', $quiz->correct_score);
-        $incorrectScores = explode(',', $quiz->incorrect_score);
-
+        $Cauhois = $dethi->getQuestions();
+        $correctScores = explode(',', $dethi->correct_score);
+        $incorrectScores = explode(',', $dethi->incorrect_score);
         $userAnswers = $request->input('ans', []);
         $score = 0;
-        foreach ($questions as $index => $question) {
+        foreach ($Cauhois as $index => $question) {
             $cScore = isset($correctScores[$index]) ? (int)$correctScores[$index] : (int)$correctScores[0];
             $iScore = isset($incorrectScores[$index]) ? (int)$incorrectScores[$index] : (int)$incorrectScores[0];
 
             $userChoice = $userAnswers[$question->qid] ?? null;
-            $correctOption = $question->options->where('score', '>', 0)->first();
+            $correctOption = $question->options->where('score',1)->first();
 
             if ($userChoice && $correctOption && $userChoice == $correctOption->oid) {
                 $score += $cScore;
@@ -50,20 +45,20 @@ class QizzController extends Controller
             }
         }
         $score = max(0, $score);
-        $totalPossibleScore = $quiz->duration;
-        $percentage = ($totalPossibleScore > 0) ? ($score / $totalPossibleScore) * 100 : 0;
+        $socauhoi = $dethi->noq;
+        $percentage = ($socauhoi > 0) ? ($score / $socauhoi) * 100 : 0;
         $result = Result::create([
             'quid' => $quid,
             'uid' => Auth::id(),
             'score_obtained' => $score,
             'percentage_obtained' => $percentage,
-            'result_status' => ($percentage >= $quiz->pass_percentage) ? 'Pass' : 'Fail',
+            'result_status' => ($percentage >= $dethi->pass_percentage) ? 'Pass' : 'Fail',
             'start_time' => $startTime,
             'end_time' => time(),
-            'total_time' => (int)$request->input('total_time', 0),
+            'total_time' => time() - $startTime,
             'attempted_ip' => $request->ip(),
-            'categories' => $quiz->gids ?? '0',
-            'r_qids' => $quiz->qids ?? '0',
+            'categories' => $dethi->gids ?? '0',
+            'r_qids' => $dethi->qids ?? '0',
             'category_range' => '0',
             'individual_time' => '0',
             'score_individual' => '0',
@@ -75,8 +70,9 @@ class QizzController extends Controller
     }
     public function result(String $rid)
     {
-        $result = Result::findOrFail($rid);
-        $quiz = Quizz::findOrFail($result->quid);
-        return view('ket-qua', compact('result', 'quiz'));
+        $result= Result::findOrFail($rid);
+        $quiz=Quizz::findOrFail($result->quid);
+        return view('ket-qua', compact('result','quiz', 'userAnswers'));
     }
+
 }

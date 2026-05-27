@@ -16,5 +16,5 @@ class Options extends Model
         'q_option_match',
         'score'
     ];
-  
+    
 }

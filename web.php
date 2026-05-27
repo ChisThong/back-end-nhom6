@@ -8,7 +8,7 @@ use App\Http\Controllers\AdminQuestionController;
 use Illuminate\Http\Request;
 
 Route::get('/', [QizzController::class, 'index'])->name('quiz.index');
-Route::get('/quiz/{id}', [QizzController::class, 'show'])->middleware('auth')->name('quiz.show');
+Route::get('/quiz/{id}', [QizzController::class, 'show'])->name('quiz.show');
 Route::post('/quiz/{id}/submit', [QizzController::class, 'submit'])->name('quiz.submit');
 Route::get('/result/{id}', [QizzController::class, 'result'])->name('quiz.result');
 Route::post('/login', [AuthController::class, 'Login'])->name('login');
